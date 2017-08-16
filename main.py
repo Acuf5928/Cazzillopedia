@@ -33,84 +33,80 @@ def cazzillo_text_parser(cazzillotext):
     domains = [urlparse(suburl).netloc for suburl in re.findall(r'(https?://[^\s]+)', cazzillotext)]
     return [{'url': u, 'domain': d} for u, d in zip(urls, domains)]
 
+if __name__ == "__main__":
+    # retrieve the file in memory
+    try:
+        with urllib.request.urlopen('https://docs.google.com/spreadsheets/d/1KyLkkGDPqYh6TUgBLaysjX3w6oIm2YPDc7tWffQJeDE/export?format=csv&id=KEY&gid=0') as response:
+            respo = response.read()
+    except:
+        print("Impossibile scaricare il file csv da Google")
+        exit()
 
-# retrieve the file in memory
-try:
-    with urllib.request.urlopen('https://docs.google.com/spreadsheets/d/1KyLkkGDPqYh6TUgBLaysjX3w6oIm2YPDc7tWffQJeDE/export?format=csv&id=KEY&gid=0') as response:
-        respo = response.read()
-except:
-    print("Impossibile scaricare il file csv da Google")
-    exit()
+    # generate a fake file pointer with io
+    fake_file = io.StringIO(respo.decode("utf-8"))
+    # read the fake file in a csv dict and convert to list
+    cazzillidict = list(csv.DictReader(fake_file))
+    for cazz in cazzillidict:
+        # extract urls and domains
+        cazz['urldomainlist'] = cazzillo_text_parser(cazz['Cazzillo'])
 
-# generate a fake file pointer with io
-fake_file = io.StringIO(respo.decode("utf-8"))
-# read the fake file in a csv dict and convert to list
-cazzillidict = list(csv.DictReader(fake_file))
-for cazz in cazzillidict:
-    # extract urls and domains
-    cazz['urldomainlist'] = cazzillo_text_parser(cazz['Cazzillo'])
+        if cazz['urldomainlist'] == []:
+            del cazz['Nome']
+            del cazz['Cazzillo']
+            del cazz['urldomainlist']
+            del cazz['Data']
+        else:
+            # convert Data to datetime
+            cazz['Data'] = datetime.strptime(cazz['Data'], '%a %b %d %Y %H:%M:%S GMT%z (%Z)')
 
-    if cazz['urldomainlist'] == []:
-        del cazz['Nome']
-        del cazz['Cazzillo']
-        del cazz['urldomainlist']
-        del cazz['Data']
-    else:
-        # convert Data to datetime
-        cazz['Data'] = datetime.strptime(cazz['Data'], '%a %b %d %Y %H:%M:%S GMT%z (%Z)')
+    # Data example:
+    #{'Cazzillo'     : 'Altro package manager molto famoso perac è homebrew https://brew.sh/, in particolare cask installa programmi per Mac proprio eliminando lo scarica apri copia in applicazioni etc, tutto da command line https://caskroom.github.io/ #cazzillo',
+    # 'Data'         : datetime.datetime(2017, 8, 10, 19, 29, 12, tzinfo=datetime.timezone(datetime.timedelta(0), 'UTC')),
+    # 'Nome'         : "Mario D'Amore",
+    # 'urldomainlist': [
+    #                   {'domain': 'brew.sh', 'url': 'https://brew.sh/'},
+    #                   {'domain': 'caskroom.github.io', 'url': 'https://caskroom.github.io/'}
+    #                  ]
+    # }
 
-# Data example:
-#{'Cazzillo'     : 'Altro package manager molto famoso perac è homebrew https://brew.sh/, in particolare cask installa programmi per Mac proprio eliminando lo scarica apri copia in applicazioni etc, tutto da command line https://caskroom.github.io/ #cazzillo',
-# 'Data'         : datetime.datetime(2017, 8, 10, 19, 29, 12, tzinfo=datetime.timezone(datetime.timedelta(0), 'UTC')),
-# 'Nome'         : "Mario D'Amore",
-# 'urldomainlist': [
-#                   {'domain': 'brew.sh', 'url': 'https://brew.sh/'},
-#                   {'domain': 'caskroom.github.io', 'url': 'https://caskroom.github.io/'}
-#                  ]
-# }
-
-# rendering the data with jinja2 and bootstrap CDN css (you need to be online!)
-t = Template(
-"""
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cazzillopedia</title>
-  <meta name="description" content="Cazzillopedia da Telefram">
-  <meta name="author" content="geekcookies">
-<!-- Latest compiled and minified CSS bootstrap3 -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-</head>
-
-<body>
-<H1 ALIGN=CENTER><P><B>Elenco Cazzilli</B></H1></P>
-<div class="container-fluid">
-{% for cazz in cazzinput %}
-<div class="cazzilloentry">
-    <div class="img-rounded" style="background-color:#D6EAF8;">
+    # rendering the data with jinja2 and bootstrap CDN css (you need to be online!)
+    t = Template(
+    """
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Cazzillopedia</title>
+      <meta name="description" content="Cazzillopedia da Telegram">
+      <meta name="author" content="geekcookies">
+    <!-- Latest compiled and minified CSS bootstrap3 -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    </head>
     
-    <div style="float: left"> {{ cazz['Cazzillo']}} </div>
-    <div style="text-align: right"> {{ cazz['Nome']}}</div>
-    <div style="text-align: right"> {{ cazz['Data']}} </div>
-            <ol>
-                {% for udl in cazz['urldomainlist'] %}
-                    <li><a href="{{udl['url']}}">{{udl['domain']}}</a></li>
-                {% endfor %}
-            </ol>
+    <body>
+    <H1 ALIGN=CENTER><P><B>Elenco Cazzilli</B></H1></P>
+    <div class="container-fluid">
+    {% for cazz in cazzinput %}
+    <div class="cazzilloentry">
+        <div class="img-rounded" style="background-color:#D6EAF8;">
+        
+        <div style="float: left"> {{ cazz['Cazzillo']}} </div>
+        <div style="text-align: right"> {{ cazz['Nome']}}</div>
+        <div style="text-align: right"> {{ cazz['Data']}} </div>
+                <ol>
+                    {% for udl in cazz['urldomainlist'] %}
+                        <li><a href="{{udl['url']}}">{{udl['domain']}}</a></li>
+                    {% endfor %}
+                </ol>
+        </div>
     </div>
-</div>
-{% endfor %}
-</div>
-</body>
-</html>
-""")
+    {% endfor %}
+    </div>
+    </body>
+    </html>
+    """)
 
-# write the rendered template to a file
-with open("geekcookies_cazzilli_telegram.csv.html", "w+") as fow:
-        for a in t.render(cazzinput=cazzillidict):
-            try:
-                fow.write(a)
-            except:
-                print(".")
+    # write the rendered template to a file
+    with open("geekcookies_cazzilli_telegram.csv.html", "w+") as fow:
+            fow.write(t.render(cazzinput=cazzillidict))
